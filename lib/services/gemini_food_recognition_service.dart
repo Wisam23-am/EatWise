@@ -2,9 +2,10 @@ import 'dart:io';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'dart:convert';
 import '../models/food_product.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GeminiFoodRecognitionService {
-  static const String apiKey = 'AIzaSyD7_ie_k-iF84cZzyGCEow2jdxUC21lXYI';
+  static final String apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
   late final GenerativeModel _model;
 
