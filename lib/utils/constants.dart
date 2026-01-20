@@ -1,7 +1,7 @@
 /// Constants used throughout the app
 class AppConstants {
   // App Info
-  static const String appName = 'FoodFect';
+  static const String appName = 'EatWise';
   static const String appTagline = 'Scan & Cek Makananmu';
 
   // Storage Keys

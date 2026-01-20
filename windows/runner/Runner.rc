@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "foodfect" "\0"
+                VALUE "FileDescription", "EatWise" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "foodfect" "\0"
+                VALUE "InternalName", "EatWise" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "foodfect.exe" "\0"
-            VALUE "ProductName", "foodfect" "\0"
+                VALUE "OriginalFilename", "EatWise.exe" "\0"
+                VALUE "ProductName", "EatWise" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

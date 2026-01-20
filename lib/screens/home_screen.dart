@@ -66,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 24),
               // Title
               Text(
-                'FoodFect',
+                'EatWise',
                 style: GoogleFonts.poppins(
                   fontSize: 42,
                   fontWeight: FontWeight.bold,

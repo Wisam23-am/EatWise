@@ -39,12 +39,10 @@ flutter pub get
 
 #### Issue: Camera Permission Denied
 **Android:**
-- Check `AndroidManifest.xml` has camera permission
-- Go to Settings → Apps → FoodFect → Permissions → Enable Camera
+ Go to Settings → Apps → EatWise → Permissions → Enable Camera
 
 **iOS:**
-- Check `Info.plist` has NSCameraUsageDescription
-- Go to Settings → Privacy → Camera → Enable for FoodFect
+ Go to Settings → Privacy → Camera → Enable for EatWise
 
 **Code fix:**
 ```dart

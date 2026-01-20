@@ -1,6 +1,6 @@
 {
-    "name": "foodfect",
-    "short_name": "foodfect",
+    "name": "EatWise",
+    "short_name": "EatWise",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

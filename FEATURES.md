@@ -1,4 +1,4 @@
-# FoodFect - App Features & Screenshots
+# EatWise - App Features & Screenshots
 
 ## 🎯 Main Features
 
