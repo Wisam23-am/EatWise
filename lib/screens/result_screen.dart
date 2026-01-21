@@ -1,26 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../models/user_profile.dart';
 import '../models/food_product.dart';
 import '../services/food_analyzer.dart';
+import '../providers/user_provider.dart';
 import 'barcode_scanner_screen.dart';
 
-class ResultScreen extends StatelessWidget {
-  final UserProfile userProfile;
+class ResultScreen extends StatefulWidget {
   final FoodProduct foodProduct;
 
-  const ResultScreen({
-    super.key,
-    required this.userProfile,
-    required this.foodProduct,
-  });
+  const ResultScreen({super.key, required this.foodProduct});
+
+  @override
+  State<ResultScreen> createState() => _ResultScreenState();
+}
+
+class _ResultScreenState extends State<ResultScreen> {
+  late AnalysisResult analysis;
+  late UserProfile userProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ambil data profil dari Provider
+    userProfile = Provider.of<UserProvider>(
+      context,
+      listen: false,
+    ).userProfile!;
+
+    // Jalankan analisis cerdas
+    analysis = FoodAnalyzer.analyzeFoodSuitability(
+      userProfile,
+      widget.foodProduct,
+    );
+
+    // Haptic Feedback saat hasil muncul
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (analysis.isSafe) {
+        HapticFeedback.lightImpact();
+      } else {
+        HapticFeedback.heavyImpact();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final analysis = FoodAnalyzer.analyzeFoodSuitability(
-      userProfile,
-      foodProduct,
-    );
+    // Tentukan warna tema berdasarkan hasil (Merah/Kuning/Hijau)
+    final themeColor = _getThemeColor(analysis.trafficLight);
 
     return Scaffold(
       appBar: AppBar(
@@ -28,158 +57,181 @@ class ResultScreen extends StatelessWidget {
           'Hasil Analisis',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
-        backgroundColor: Colors.teal.shade600,
+        backgroundColor: themeColor,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // Kembali ke scanner
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    BarcodeScannerScreen(userProfile: userProfile),
-              ),
-            );
-          },
+          onPressed: () => Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const BarcodeScannerScreen(),
+            ),
+          ),
         ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Product Card
+          // 1. KARTU PRODUK (Hero Animation)
           _buildProductCard(),
           const SizedBox(height: 16),
 
-          // Overall Score
-          _buildScoreCard(analysis),
-          const SizedBox(height: 16),
+          // 2. SKOR UTAMA (Traffic Light)
+          _buildScoreCard(themeColor),
+          const SizedBox(height: 20),
 
-          // Warnings
+          // 3. PROFIL USER (Dikembalikan Lengkap dengan Desain Baru)
+          Text("KONTEKS PENGGUNA", style: _headerStyle()),
+          const SizedBox(height: 8),
+          _buildUserStatsSection(),
+          const SizedBox(height: 20),
+
+          // 4. PERINGATAN (Warnings)
           if (analysis.warnings.isNotEmpty) ...[
+            Text("PERINGATAN", style: _headerStyle()),
+            const SizedBox(height: 8),
             _buildWarningsCard(analysis.warnings),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
           ],
 
-          // Recommendations
+          // 5. REKOMENDASI (Recommendations)
+          // Selalu tampilkan header jika ada isinya
           if (analysis.recommendations.isNotEmpty) ...[
+            Text("REKOMENDASI", style: _headerStyle()),
+            const SizedBox(height: 8),
             _buildRecommendationsCard(analysis.recommendations),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
           ],
 
-          // Nutrition Info
-          if (foodProduct.nutriments != null) ...[
-            _buildNutritionCard(foodProduct.nutriments!),
-            const SizedBox(height: 16),
-          ],
+          // 6. INFO NUTRISI
+          Text("DETAIL NUTRISI", style: _headerStyle()),
+          const SizedBox(height: 8),
+          if (widget.foodProduct.nutriments != null)
+            _buildNutritionCard(widget.foodProduct.nutriments!)
+          else
+            const Text("Data nutrisi tidak tersedia lengkap."),
 
-          // User Info Summary
-          _buildUserSummaryCard(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 30),
 
-          // Scan Again Button
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pushReplacement(
+          // TOMBOL SCAN LAGI
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      BarcodeScannerScreen(userProfile: userProfile),
+                  builder: (context) => const BarcodeScannerScreen(),
                 ),
-              );
-            },
-            icon: const Icon(Icons.qr_code_scanner),
-            label: Text(
-              'Scan Produk Lain',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
               ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal.shade600,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+              icon: const Icon(Icons.qr_code_scanner),
+              label: Text(
+                'Scan Produk Lain',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: themeColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 4,
               ),
             ),
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
+  // --- STYLE HELPERS ---
+
+  Color _getThemeColor(TrafficLight light) {
+    switch (light) {
+      case TrafficLight.green:
+        return Colors.teal.shade700;
+      case TrafficLight.yellow:
+        return Colors.orange.shade800;
+      case TrafficLight.red:
+        return Colors.red.shade700;
+    }
+  }
+
+  TextStyle _headerStyle() {
+    return GoogleFonts.poppins(
+      fontSize: 13,
+      fontWeight: FontWeight.bold,
+      color: Colors.grey.shade600,
+      letterSpacing: 1.2,
+    );
+  }
+
+  // --- WIDGET BUILDERS ---
+
   Widget _buildProductCard() {
+    // Fallback nama produk
+    String displayName =
+        widget.foodProduct.productName ??
+        widget.foodProduct.brands ??
+        'Produk Tanpa Nama';
+    if (displayName.trim().isEmpty)
+      displayName = 'Barcode: ${widget.foodProduct.barcode}';
+
     return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            // Product Image
-            if (foodProduct.imageUrl != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  foodProduct.imageUrl!,
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      _buildPlaceholderImage(),
+            // Hero Image
+            Hero(
+              tag: widget.foodProduct.barcode.isNotEmpty
+                  ? widget.foodProduct.barcode
+                  : 'product_img',
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.grey.shade100,
+                  image: widget.foodProduct.imageUrl != null
+                      ? DecorationImage(
+                          image: NetworkImage(widget.foodProduct.imageUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                 ),
-              )
-            else
-              _buildPlaceholderImage(),
-
+                child: widget.foodProduct.imageUrl == null
+                    ? Icon(Icons.fastfood, color: Colors.grey.shade400)
+                    : null,
+              ),
+            ),
             const SizedBox(width: 16),
-
-            // Product Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    foodProduct.productName ?? 'Produk Tidak Dikenal',
+                    displayName,
                     style: GoogleFonts.poppins(
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (foodProduct.brands != null) ...[
-                    const SizedBox(height: 4),
+                  const SizedBox(height: 4),
+                  if (widget.foodProduct.brands != null)
                     Text(
-                      foodProduct.brands!,
+                      widget.foodProduct.brands!,
                       style: GoogleFonts.poppins(
                         fontSize: 13,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  if (foodProduct.nutriscoreGrade != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getNutriscoreColor(
-                          foodProduct.nutriscoreGrade!,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Nutriscore ${foodProduct.nutriscoreGrade!.toUpperCase()}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
+                        color: Colors.grey[600],
                       ),
                     ),
                 ],
@@ -191,383 +243,377 @@ class ResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaceholderImage() {
+  Widget _buildScoreCard(Color color) {
+    String title;
+    IconData icon;
+
+    switch (analysis.trafficLight) {
+      case TrafficLight.green:
+        title = "Aman Dikonsumsi";
+        icon = Icons.verified_user_rounded;
+        break;
+      case TrafficLight.yellow:
+        title = "Konsumsi Terbatas";
+        icon = Icons.warning_amber_rounded;
+        break;
+      case TrafficLight.red:
+        title = "Tidak Disarankan";
+        icon = Icons.dangerous_rounded;
+        break;
+    }
+
     return Container(
-      width: 80,
-      height: 80,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(8),
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
-      child: Icon(Icons.fastfood, size: 40, color: Colors.grey.shade400),
+      child: Column(
+        children: [
+          Icon(icon, size: 48, color: color),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Skor Kecocokan: ${analysis.overallScore.toStringAsFixed(0)}%',
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.black54),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildScoreCard(AnalysisResult analysis) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: analysis.isSafe ? Colors.green.shade50 : Colors.red.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(
-              analysis.isSafe ? Icons.check_circle : Icons.warning,
-              size: 60,
-              color: analysis.isSafe ? Colors.green : Colors.red,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              analysis.isSafe ? 'Aman Dikonsumsi' : 'Tidak Disarankan',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: analysis.isSafe
-                    ? Colors.green.shade700
-                    : Colors.red.shade700,
+  // --- BAGIAN INI MENGEMBALIKAN DATA LAMA DENGAN TAMPILAN BARU ---
+  Widget _buildUserStatsSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade100,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Baris 1: Statistik Angka (BMI & Kalori)
+          Row(
+            children: [
+              Expanded(
+                child: _userStatItem(
+                  label: "BMI",
+                  value: userProfile.bmi.toStringAsFixed(1),
+                  subValue: userProfile.bmiCategory, // e.g., "Normal"
+                  icon: Icons.monitor_weight_outlined,
+                  color: Colors.blue,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Skor: ${analysis.overallScore.toStringAsFixed(0)}/100',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
+              Container(width: 1, height: 40, color: Colors.grey.shade300),
+              Expanded(
+                child: _userStatItem(
+                  label: "Keb. Kalori",
+                  value: "${userProfile.dailyCalorieNeeds.toStringAsFixed(0)}",
+                  subValue: "kkal/hari",
+                  icon: Icons.local_fire_department_outlined,
+                  color: Colors.orange,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              analysis.scoreCategory,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey.shade600,
+              Container(width: 1, height: 40, color: Colors.grey.shade300),
+              Expanded(
+                child: _userStatItem(
+                  label: "Tujuan",
+                  value: userProfile.goal,
+                  subValue: userProfile.activityLevel,
+                  icon: Icons.flag_outlined,
+                  color: Colors.green,
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+
+          // Baris 2: Tags (Penyakit & Alergi)
+          Text(
+            "Kondisi Kesehatan:",
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: Colors.grey.shade600,
             ),
-          ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (userProfile.medicalConditions.isEmpty &&
+                  userProfile.allergies.isEmpty)
+                _chipItem("Sehat / Tanpa Pantangan", Colors.grey),
+
+              ...userProfile.medicalConditions.map(
+                (e) => _chipItem(e, Colors.red),
+              ),
+              ...userProfile.allergies.map(
+                (e) => _chipItem("Alergi $e", Colors.orange),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _userStatItem({
+    required String label,
+    required String value,
+    required String subValue,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, size: 20, color: color),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        Text(
+          subValue,
+          style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade600),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _chipItem(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.poppins(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: color.withOpacity(0.8),
         ),
       ),
     );
   }
 
   Widget _buildWarningsCard(List<Warning> warnings) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.warning_amber, color: Colors.orange.shade700),
-                const SizedBox(width: 8),
-                Text(
-                  'Peringatan',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
+    return Column(
+      children: warnings
+          .map(
+            (w) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: w.severity == WarningSeverity.high
+                      ? Colors.red.shade300
+                      : Colors.orange.shade300,
                 ),
-              ],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.shade100,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    w.severity == WarningSeverity.high
+                        ? Icons.cancel
+                        : Icons.warning_amber,
+                    color: w.severity == WarningSeverity.high
+                        ? Colors.red
+                        : Colors.orange,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          w.title,
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          w.message,
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            ...warnings.map((warning) => _buildWarningItem(warning)),
-          ],
-        ),
-      ),
+          )
+          .toList(),
     );
   }
 
-  Widget _buildWarningItem(Warning warning) {
-    Color color;
-    IconData icon;
-
-    switch (warning.severity) {
-      case WarningSeverity.high:
-        color = Colors.red;
-        icon = Icons.error;
-        break;
-      case WarningSeverity.medium:
-        color = Colors.orange;
-        icon = Icons.warning;
-        break;
-      case WarningSeverity.low:
-        color = Colors.blue;
-        icon = Icons.info;
-        break;
-    }
-
+  Widget _buildRecommendationsCard(List<String> recs) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green.shade200),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  warning.title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  warning.message,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecommendationsCard(List<String> recommendations) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.tips_and_updates, color: Colors.green.shade700),
-                const SizedBox(width: 8),
-                Text(
-                  'Rekomendasi',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...recommendations.map(
-              (rec) => Padding(
+      child: Column(
+        children: recs
+            .map(
+              (r) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.check_circle,
-                      color: Colors.green.shade600,
-                      size: 18,
+                      color: Colors.green,
+                      size: 20,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        rec,
+                        r,
                         style: GoogleFonts.poppins(
                           fontSize: 13,
-                          color: Colors.grey.shade700,
+                          color: Colors.green.shade900,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
+            )
+            .toList(),
       ),
     );
   }
 
-  Widget _buildNutritionCard(Nutriments nutriments) {
+  Widget _buildNutritionCard(Nutriments n) {
     return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      elevation: 0,
+      color: Colors.grey.shade50,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: true,
+          title: Text(
+            "Informasi Nilai Gizi",
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+          subtitle: Text(
+            "Per 100g sajian",
+            style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
+          ),
           children: [
-            Text(
-              'Informasi Nutrisi (per 100g)',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                children: [
+                  _nutriRow(
+                    "Energi",
+                    "${n.energyKcal?.toStringAsFixed(0) ?? '-'} kkal",
+                  ),
+                  _nutriRow(
+                    "Lemak Total",
+                    "${n.fat?.toStringAsFixed(1) ?? '-'} g",
+                  ),
+                  _nutriRow(
+                    "Lemak Jenuh",
+                    "${n.saturatedFat?.toStringAsFixed(1) ?? '-'} g",
+                  ),
+                  _nutriRow(
+                    "Karbohidrat",
+                    "${n.carbohydrates?.toStringAsFixed(1) ?? '-'} g",
+                  ),
+                  _nutriRow("Gula", "${n.sugars?.toStringAsFixed(1) ?? '-'} g"),
+                  _nutriRow(
+                    "Protein",
+                    "${n.proteins?.toStringAsFixed(1) ?? '-'} g",
+                  ),
+                  _nutriRow("Garam", "${n.salt?.toStringAsFixed(2) ?? '-'} g"),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            if (nutriments.energyKcal != null)
-              _buildNutrientRow(
-                'Kalori',
-                '${nutriments.energyKcal!.toStringAsFixed(0)} kcal',
-              ),
-            if (nutriments.proteins != null)
-              _buildNutrientRow(
-                'Protein',
-                '${nutriments.proteins!.toStringAsFixed(1)} g',
-              ),
-            if (nutriments.carbohydrates != null)
-              _buildNutrientRow(
-                'Karbohidrat',
-                '${nutriments.carbohydrates!.toStringAsFixed(1)} g',
-              ),
-            if (nutriments.sugars != null)
-              _buildNutrientRow(
-                '  - Gula',
-                '${nutriments.sugars!.toStringAsFixed(1)} g',
-              ),
-            if (nutriments.fat != null)
-              _buildNutrientRow(
-                'Lemak',
-                '${nutriments.fat!.toStringAsFixed(1)} g',
-              ),
-            if (nutriments.saturatedFat != null)
-              _buildNutrientRow(
-                '  - Lemak Jenuh',
-                '${nutriments.saturatedFat!.toStringAsFixed(1)} g',
-              ),
-            if (nutriments.fiber != null)
-              _buildNutrientRow(
-                'Serat',
-                '${nutriments.fiber!.toStringAsFixed(1)} g',
-              ),
-            if (nutriments.salt != null)
-              _buildNutrientRow(
-                'Garam',
-                '${nutriments.salt!.toStringAsFixed(2)} g',
-              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNutrientRow(String label, String value) {
+  Widget _nutriRow(String label, String val) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 14,
               color: Colors.grey.shade700,
+              fontSize: 13,
             ),
           ),
           Text(
-            value,
+            val,
             style: GoogleFonts.poppins(
-              fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade800,
+              fontSize: 13,
             ),
           ),
         ],
       ),
     );
-  }
-
-  Widget _buildUserSummaryCard() {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Profil Anda',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildInfoRow(
-              'BMI',
-              '${userProfile.bmi.toStringAsFixed(1)} (${userProfile.bmiCategory})',
-            ),
-            _buildInfoRow(
-              'Kebutuhan Kalori',
-              '${userProfile.dailyCalorieNeeds.toStringAsFixed(0)} kcal/hari',
-            ),
-            _buildInfoRow('Tujuan', userProfile.goal),
-            if (userProfile.medicalConditions.isNotEmpty)
-              _buildInfoRow(
-                'Riwayat Penyakit',
-                userProfile.medicalConditions.join(', '),
-              ),
-            if (userProfile.allergies.isNotEmpty)
-              _buildInfoRow('Alergi', userProfile.allergies.join(', ')),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey.shade800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getNutriscoreColor(String grade) {
-    switch (grade.toLowerCase()) {
-      case 'a':
-        return Colors.green.shade700;
-      case 'b':
-        return Colors.lightGreen.shade600;
-      case 'c':
-        return Colors.orange.shade600;
-      case 'd':
-        return Colors.deepOrange.shade600;
-      case 'e':
-        return Colors.red.shade700;
-      default:
-        return Colors.grey.shade600;
-    }
   }
 }

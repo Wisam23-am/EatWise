@@ -1,53 +1,73 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart'; // Untuk debugPrint
 import 'package:http/http.dart' as http;
 import '../models/food_product.dart';
 
-class OpenFoodFactsService {
-  static const String baseUrl = 'https://world.openfoodfacts.org/api/v2';
+class CachedItem {
+  final FoodProduct product;
+  final DateTime timestamp;
 
-  /// Mendapatkan informasi produk berdasarkan barcode
+  CachedItem(this.product, this.timestamp);
+}
+
+class OpenFoodFactsService {
+  static const String _userAgent = 'EatWise/1.0.0 (contact@eatwise.app)';
+  // Gunakan URL API yang stabil
+  static const String _baseUrl =
+      'https://world.openfoodfacts.org/api/v2/product/';
+
+  static final Map<String, CachedItem> _cache = {};
+  static const Duration _cacheDuration = Duration(minutes: 10);
+
   Future<FoodProduct?> getProductByBarcode(String barcode) async {
+    // 1. Cek Cache
+    if (_cache.containsKey(barcode)) {
+      final cachedItem = _cache[barcode]!;
+      final difference = DateTime.now().difference(cachedItem.timestamp);
+      if (difference < _cacheDuration) {
+        debugPrint('📦 Cache Hit: $barcode');
+        return cachedItem.product;
+      } else {
+        _cache.remove(barcode);
+      }
+    }
+
     try {
-      final url = Uri.parse('$baseUrl/product/$barcode');
-      final response = await http.get(url);
+      final uri = Uri.parse('$_baseUrl$barcode.json');
+      debugPrint('🌐 Fetching: $uri');
+
+      final response = await http
+          .get(
+            uri,
+            headers: {'User-Agent': _userAgent, 'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final Map<String, dynamic> data = json.decode(response.body);
 
-        // Cek apakah produk ditemukan
-        if (data['status'] == 1) {
-          return FoodProduct.fromJson(data);
+        // API v2 mengembalikan status 1 jika ditemukan
+        if (data['status'] == 1 || (data['product'] != null)) {
+          // --- PERBAIKAN FATAL DISINI ---
+          // Sebelumnya: FoodProduct.fromJson(data['product']); -> SALAH (membuat data null)
+          // Seharusnya: FoodProduct.fromJson(data); -> BENAR (Model mengharapkan root JSON)
+          final product = FoodProduct.fromJson(data);
+
+          _cache[barcode] = CachedItem(product, DateTime.now());
+          return product;
         } else {
-          return null; // Produk tidak ditemukan
+          debugPrint(
+            '❌ Status produk tidak ditemukan (status: ${data['status']})',
+          );
+          return null;
         }
       } else {
-        throw Exception('Gagal mengambil data produk');
+        debugPrint('⚠️ HTTP Error: ${response.statusCode}');
+        return null;
       }
     } catch (e) {
-      print('Error fetching product: $e');
-      return null;
-    }
-  }
-
-  /// Mencari produk berdasarkan nama
-  Future<List<FoodProduct>> searchProducts(String query) async {
-    try {
-      final url = Uri.parse('$baseUrl/search?search_terms=$query&page_size=10');
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final products = data['products'] as List;
-
-        return products.map((p) {
-          return FoodProduct.fromJson({'product': p, 'code': p['code']});
-        }).toList();
-      } else {
-        throw Exception('Gagal mencari produk');
-      }
-    } catch (e) {
-      print('Error searching products: $e');
-      return [];
+      debugPrint('⚠️ Exception: $e');
+      throw Exception('Gagal memuat data produk: $e');
     }
   }
 }

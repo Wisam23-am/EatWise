@@ -24,7 +24,7 @@ class AppConstants {
   static const double bmiNormal = 25.0;
   static const double bmiOverweight = 30.0;
 
-  // Activity Level Multipliers (for calorie calculation)
+  // Activity Level Multipliers
   static const double activityLow = 1.375;
   static const double activityMedium = 1.55;
   static const double activityHigh = 1.725;
@@ -32,7 +32,7 @@ class AppConstants {
   // Nutrition Thresholds (per 100g)
   static const double highSugar = 15.0; // g
   static const double mediumSugar = 5.0; // g
-  static const double highSodium = 0.5; // g
+  static const double highSodium = 0.5; // g (500mg)
   static const double highSalt = 1.5; // g
   static const double highSaturatedFat = 5.0; // g
   static const double highCalories = 400.0; // kcal
@@ -56,20 +56,24 @@ class AppConstants {
   static const double fairScoreMin = 40.0;
   static const double poorScoreMin = 20.0;
 
-  // Dangerous Additives (E-numbers)
-  static const List<String> dangerousAdditives = [
-    'e102', // Tartrazine (Yellow)
-    'e104', // Quinoline Yellow
-    'e110', // Sunset Yellow
-    'e122', // Carmoisine
-    'e124', // Ponceau 4R
-    'e129', // Allura Red
-    'e211', // Sodium Benzoate
-    'e220', // Sulphur Dioxide
-    'e621', // MSG
-  ];
+  // Dangerous Additives Dictionary (Code -> Description)
+  // Format: Code : "Name - Reason"
+  static const Map<String, String> dangerousAdditivesDetails = {
+    'e102': 'Tartrazine (Pewarna) - Risiko hiperaktivitas & alergi',
+    'e104': 'Quinoline Yellow - Dilarang di beberapa negara',
+    'e110': 'Sunset Yellow - Risiko alergi & hiperaktivitas',
+    'e122': 'Carmoisine (Pewarna) - Risiko reaksi alergi',
+    'e124': 'Ponceau 4R - Risiko alergi pada penderita asma',
+    'e129': 'Allura Red - Risiko reaksi alergi kulit',
+    'e211': 'Sodium Benzoate (Pengawet) - Risiko hiperaktivitas',
+    'e220': 'Sulphur Dioxide - Pemicu asma & alergi pernapasan',
+    'e250': 'Sodium Nitrite - Risiko karsinogenik jika dipanaskan',
+    'e621':
+        'Monosodium Glutamate (MSG) - Risiko sakit kepala/hipertensi sensitif',
+    'e951': 'Aspartame (Pemanis) - Kontroversi efek samping neurologis',
+  };
 
-  // Sample Barcodes for Testing
+  // Sample Barcodes
   static const Map<String, String> sampleBarcodes = {
     'Nutella': '3017620422003',
     'Coca Cola': '5449000000996',
@@ -78,7 +82,7 @@ class AppConstants {
     'Oreo': '7622210449283',
   };
 
-  // Medical Conditions
+  // Lists
   static const List<String> medicalConditions = [
     'Diabetes',
     'Hipertensi',
@@ -88,7 +92,6 @@ class AppConstants {
     'Maag',
   ];
 
-  // Common Allergies
   static const List<String> commonAllergies = [
     'Kacang',
     'Susu',
@@ -99,12 +102,7 @@ class AppConstants {
     'Kedelai',
   ];
 
-  // Gender Options
   static const List<String> genderOptions = ['Laki-laki', 'Perempuan'];
-
-  // Activity Levels
   static const List<String> activityLevels = ['Rendah', 'Sedang', 'Tinggi'];
-
-  // Goals
   static const List<String> goals = ['Diet', 'Maintain', 'Bulking'];
 }

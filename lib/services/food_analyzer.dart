@@ -1,20 +1,27 @@
 import '../models/user_profile.dart';
 import '../models/food_product.dart';
+import '../utils/constants.dart';
+
+// Enum untuk Traffic Light System
+enum TrafficLight {
+  green, // Aman / Direkomendasikan
+  yellow, // Hati-hati / Konsumsi Terbatas
+  red, // Bahaya / Tidak Disarankan
+}
 
 class FoodAnalyzer {
-  /// Menganalisis apakah makanan cocok untuk user
+  /// Menganalisis apakah makanan cocok untuk user dengan logika Smart Analysis
   static AnalysisResult analyzeFoodSuitability(
     UserProfile user,
     FoodProduct food,
   ) {
     List<Warning> warnings = [];
     List<String> recommendations = [];
-    bool isSafe = true;
 
-    // 1. Cek Alergi
+    // 1. Cek Alergi (Prioritas Tertinggi)
     _checkAllergies(user, food, warnings);
 
-    // 2. Cek Kondisi Kesehatan
+    // 2. Cek Kondisi Kesehatan & Nutrisi
     _checkMedicalConditions(user, food, warnings);
 
     // 3. Cek Nutrisi berdasarkan Goal
@@ -23,14 +30,27 @@ class FoodAnalyzer {
     // 4. Cek Kualitas Makanan (Nutriscore)
     _checkFoodQuality(food, warnings, recommendations);
 
-    // 5. Cek Additives berbahaya
+    // 5. Cek Additives berbahaya (Dengan deteksi nama)
     _checkAdditives(food, warnings);
 
-    // Tentukan apakah aman
-    isSafe = !warnings.any((w) => w.severity == WarningSeverity.high);
+    // --- LOGIKA TRAFFIC LIGHT ---
+    TrafficLight trafficLight;
+
+    // Jika ada warning level HIGH (Merah), status langsung Merah
+    if (warnings.any((w) => w.severity == WarningSeverity.high)) {
+      trafficLight = TrafficLight.red;
+    }
+    // Jika ada warning level MEDIUM, atau Skor rendah, status Kuning
+    else if (warnings.any((w) => w.severity == WarningSeverity.medium)) {
+      trafficLight = TrafficLight.yellow;
+    }
+    // Sisanya Hijau
+    else {
+      trafficLight = TrafficLight.green;
+    }
 
     return AnalysisResult(
-      isSafe: isSafe,
+      trafficLight: trafficLight,
       warnings: warnings,
       recommendations: recommendations,
       overallScore: _calculateScore(warnings),
@@ -42,28 +62,35 @@ class FoodAnalyzer {
     FoodProduct food,
     List<Warning> warnings,
   ) {
-    for (var allergy in user.allergies) {
-      for (var allergen in food.allergens) {
-        if (allergen.toLowerCase().contains(allergy.toLowerCase()) ||
-            allergy.toLowerCase().contains(allergen.toLowerCase())) {
+    // Normalisasi input user
+    final userAllergies = user.allergies.map((a) => a.toLowerCase()).toList();
+
+    // Cek Allergens Tags dari API
+    for (var allergenTag in food.allergens) {
+      final allergen = allergenTag.toLowerCase();
+      for (var userAllergy in userAllergies) {
+        if (allergen.contains(userAllergy) || userAllergy.contains(allergen)) {
           warnings.add(
             Warning(
-              title: 'Peringatan Alergi!',
+              title: 'BAHAYA: Mengandung $userAllergy!',
               message:
-                  'Produk ini mengandung $allergen yang mungkin memicu alergi Anda terhadap $allergy',
+                  'Produk ini terdeteksi mengandung $allergenTag. Sangat berbahaya bagi alergi Anda.',
               severity: WarningSeverity.high,
             ),
           );
+          return; // Langsung return agar tidak duplikat warning
         }
       }
+    }
 
-      // Cek di ingredients juga
-      final ingredientsText = food.ingredients.join(' ').toLowerCase();
-      if (ingredientsText.contains(allergy.toLowerCase())) {
+    // Cek Ingredients Text (Backup jika tags kosong)
+    final ingredientsText = food.ingredients.join(' ').toLowerCase();
+    for (var userAllergy in userAllergies) {
+      if (ingredientsText.contains(userAllergy)) {
         warnings.add(
           Warning(
-            title: 'Kemungkinan Mengandung Alergen',
-            message: 'Bahan makanan mungkin mengandung $allergy',
+            title: 'Peringatan Komposisi',
+            message: 'Ditemukan bahan "$userAllergy" dalam komposisi produk.',
             severity: WarningSeverity.high,
           ),
         );
@@ -76,28 +103,26 @@ class FoodAnalyzer {
     FoodProduct food,
     List<Warning> warnings,
   ) {
-    final nutriments = food.nutriments;
-    if (nutriments == null) return;
+    final n = food.nutriments;
+    if (n == null) return;
 
     for (var condition in user.medicalConditions) {
       switch (condition.toLowerCase()) {
         case 'diabetes':
-        case 'diabetes mellitus':
-          if ((nutriments.sugars ?? 0) > 15) {
+          if ((n.sugars ?? 0) > AppConstants.highSugar) {
             warnings.add(
               Warning(
-                title: 'Tinggi Gula',
+                title: 'Bahaya Diabetes',
                 message:
-                    'Produk ini mengandung ${nutriments.sugars?.toStringAsFixed(1)}g gula per 100g. Tidak disarankan untuk penderita diabetes.',
+                    'Gula sangat tinggi (${n.sugars}g). Melebihi batas aman 15g.',
                 severity: WarningSeverity.high,
               ),
             );
-          } else if ((nutriments.sugars ?? 0) > 5) {
+          } else if ((n.sugars ?? 0) > AppConstants.mediumSugar) {
             warnings.add(
               Warning(
-                title: 'Perhatian Kadar Gula',
-                message:
-                    'Produk ini mengandung ${nutriments.sugars?.toStringAsFixed(1)}g gula per 100g. Konsumsi dengan hati-hati.',
+                title: 'Perhatian Diabetes',
+                message: 'Kandungan gula (${n.sugars}g) perlu dibatasi.',
                 severity: WarningSeverity.medium,
               ),
             );
@@ -105,23 +130,15 @@ class FoodAnalyzer {
           break;
 
         case 'hipertensi':
-        case 'darah tinggi':
-          if ((nutriments.sodium ?? 0) > 0.5) {
+          // Cek Sodium (Natrium) dan Salt (Garam)
+          if ((n.sodium ?? 0) > AppConstants.highSodium ||
+              (n.salt ?? 0) > AppConstants.highSalt) {
             warnings.add(
               Warning(
-                title: 'Tinggi Natrium',
+                title: 'Bahaya Hipertensi',
                 message:
-                    'Produk ini mengandung ${nutriments.sodium?.toStringAsFixed(2)}g natrium per 100g. Tidak disarankan untuk penderita hipertensi.',
+                    'Garam/Natrium tinggi. Dapat memicu tekanan darah naik.',
                 severity: WarningSeverity.high,
-              ),
-            );
-          } else if ((nutriments.salt ?? 0) > 1.5) {
-            warnings.add(
-              Warning(
-                title: 'Perhatian Kadar Garam',
-                message:
-                    'Produk ini mengandung ${nutriments.salt?.toStringAsFixed(1)}g garam per 100g.',
-                severity: WarningSeverity.medium,
               ),
             );
           }
@@ -129,12 +146,12 @@ class FoodAnalyzer {
 
         case 'kolesterol tinggi':
         case 'kolesterol':
-          if ((nutriments.saturatedFat ?? 0) > 5) {
+          if ((n.saturatedFat ?? 0) > AppConstants.highSaturatedFat) {
             warnings.add(
               Warning(
-                title: 'Tinggi Lemak Jenuh',
+                title: 'Bahaya Kolesterol',
                 message:
-                    'Produk ini mengandung ${nutriments.saturatedFat?.toStringAsFixed(1)}g lemak jenuh per 100g. Dapat meningkatkan kolesterol.',
+                    'Lemak jenuh tinggi (${n.saturatedFat}g). Buruk untuk jantung.',
                 severity: WarningSeverity.high,
               ),
             );
@@ -142,12 +159,37 @@ class FoodAnalyzer {
           break;
 
         case 'obesitas':
-          if ((nutriments.energyKcal ?? 0) > 400) {
+          if ((n.energyKcal ?? 0) > AppConstants.highCalories) {
             warnings.add(
               Warning(
-                title: 'Tinggi Kalori',
+                title: 'Sangat Tinggi Kalori',
                 message:
-                    'Produk ini mengandung ${nutriments.energyKcal?.toStringAsFixed(0)} kalori per 100g. Batasi konsumsi.',
+                    '${n.energyKcal?.toStringAsFixed(0)} kkal per 100g. Sangat padat energi.',
+                severity: WarningSeverity.high,
+              ),
+            );
+          } else if ((n.sugars ?? 0) > 10 || (n.fat ?? 0) > 15) {
+            warnings.add(
+              Warning(
+                title: 'Potensi Penambahan Berat',
+                message:
+                    'Kombinasi gula/lemak tinggi dapat menghambat penurunan berat badan.',
+                severity: WarningSeverity.medium,
+              ),
+            );
+          }
+          break;
+
+        case 'maag':
+        case 'asam lambung':
+          // Deteksi kasar dari kategori atau bahan (jika ada data pedas/asam)
+          // Ini placeholder logika karena data spesifik pH jarang ada di API standar
+          if ((n.fat ?? 0) > 20) {
+            warnings.add(
+              Warning(
+                title: 'Lemak Tinggi',
+                message:
+                    'Makanan berlemak tinggi dapat memicu asam lambung naik.',
                 severity: WarningSeverity.medium,
               ),
             );
@@ -163,52 +205,28 @@ class FoodAnalyzer {
     List<Warning> warnings,
     List<String> recommendations,
   ) {
-    final nutriments = food.nutriments;
-    if (nutriments == null) return;
+    final n = food.nutriments;
+    if (n == null) return;
 
-    switch (user.goal.toLowerCase()) {
-      case 'diet':
-        if ((nutriments.energyKcal ?? 0) > 300) {
-          warnings.add(
-            Warning(
-              title: 'Kalori Tinggi untuk Diet',
-              message:
-                  'Produk ini cukup tinggi kalori (${nutriments.energyKcal?.toStringAsFixed(0)} kcal/100g).',
-              severity: WarningSeverity.low,
-            ),
-          );
-        }
-        if ((nutriments.fiber ?? 0) > 5) {
-          recommendations.add(
-            'Bagus! Tinggi serat (${nutriments.fiber?.toStringAsFixed(1)}g) membantu program diet Anda.',
-          );
-        }
-        break;
-
-      case 'bulking':
-        if ((nutriments.proteins ?? 0) > 10) {
-          recommendations.add(
-            'Bagus! Tinggi protein (${nutriments.proteins?.toStringAsFixed(1)}g) mendukung program bulking Anda.',
-          );
-        }
-        if ((nutriments.energyKcal ?? 0) < 200) {
-          recommendations.add(
-            'Kalori rendah untuk bulking. Pertimbangkan porsi lebih besar.',
-          );
-        }
-        break;
-
-      case 'maintain':
-        if ((nutriments.energyKcal ?? 0) > 500) {
-          warnings.add(
-            Warning(
-              title: 'Kalori Cukup Tinggi',
-              message: 'Sesuaikan porsi untuk menjaga kalori harian Anda.',
-              severity: WarningSeverity.low,
-            ),
-          );
-        }
-        break;
+    // Logika Goal
+    if (user.goal == 'Diet') {
+      if ((n.fiber ?? 0) >= AppConstants.highFiber) {
+        recommendations.add(
+          '✨ Super Food untuk Diet: Tinggi serat (${n.fiber}g) membuat kenyang lebih lama.',
+        );
+      }
+      if ((n.proteins ?? 0) >= AppConstants.highProtein) {
+        recommendations.add(
+          '✅ Protein cukup tinggi membantu metabolisme saat diet.',
+        );
+      }
+    } else if (user.goal == 'Bulking') {
+      if ((n.proteins ?? 0) >= AppConstants.highProtein) {
+        recommendations.add('💪 Excellent: Sumber protein tinggi untuk otot.');
+      }
+      if ((n.energyKcal ?? 0) > 300) {
+        recommendations.add('🔥 Bagus untuk surplus kalori harian.');
+      }
     }
   }
 
@@ -218,61 +236,38 @@ class FoodAnalyzer {
     List<String> recommendations,
   ) {
     if (food.nutriscoreGrade != null) {
-      switch (food.nutriscoreGrade!.toLowerCase()) {
-        case 'a':
-          recommendations.add('Nutriscore A - Kualitas nutrisi sangat baik!');
-          break;
-        case 'b':
-          recommendations.add('Nutriscore B - Kualitas nutrisi baik.');
-          break;
-        case 'c':
-          recommendations.add('Nutriscore C - Kualitas nutrisi cukup.');
-          break;
-        case 'd':
-          warnings.add(
-            Warning(
-              title: 'Nutriscore D',
-              message: 'Kualitas nutrisi kurang baik. Konsumsi sesekali.',
-              severity: WarningSeverity.low,
-            ),
-          );
-          break;
-        case 'e':
-          warnings.add(
-            Warning(
-              title: 'Nutriscore E',
-              message: 'Kualitas nutrisi buruk. Hindari konsumsi rutin.',
-              severity: WarningSeverity.medium,
-            ),
-          );
-          break;
+      final grade = food.nutriscoreGrade!.toLowerCase();
+      if (grade == 'a') {
+        recommendations.add('🏆 Nutriscore A: Kualitas nutrisi terbaik.');
+      } else if (grade == 'd' || grade == 'e') {
+        warnings.add(
+          Warning(
+            title: 'Kualitas Nutrisi Rendah (Grade $grade)',
+            message:
+                'Produk ini minim gizi penting dan tinggi gula/garam/lemak.',
+            severity:
+                WarningSeverity.medium, // Medium karena bukan racun, tapi buruk
+          ),
+        );
       }
     }
   }
 
   static void _checkAdditives(FoodProduct food, List<Warning> warnings) {
-    // Daftar additives berbahaya yang umum
-    final dangerousAdditives = [
-      'e102',
-      'e104',
-      'e110',
-      'e122',
-      'e124',
-      'e129', // Pewarna berbahaya
-      'e211',
-      'e220',
-      'e621', // MSG
-    ];
+    // Menggunakan Map dari Constants
+    final dangerousMap = AppConstants.dangerousAdditivesDetails;
 
-    for (var additive in food.additives) {
-      final additiveCode = additive.toLowerCase().replaceAll('en:', '');
-      if (dangerousAdditives.contains(additiveCode)) {
+    for (var additiveTag in food.additives) {
+      // Format API biasanya "en:e102". Kita ambil kodenya saja "e102"
+      final code = additiveTag.toLowerCase().replaceAll('en:', '').trim();
+
+      if (dangerousMap.containsKey(code)) {
+        final description = dangerousMap[code];
         warnings.add(
           Warning(
-            title: 'Mengandung Bahan Tambahan Berisiko',
-            message:
-                'Produk mengandung $additiveCode yang sebaiknya dihindari.',
-            severity: WarningSeverity.medium,
+            title: 'Bahan Tambahan Berisiko ($code)',
+            message: 'Mengandung $description.',
+            severity: WarningSeverity.medium, // Warning sedang
           ),
         );
       }
@@ -281,12 +276,11 @@ class FoodAnalyzer {
 
   static double _calculateScore(List<Warning> warnings) {
     double score = 100.0;
-
-    for (var warning in warnings) {
-      switch (warning.severity) {
+    for (var w in warnings) {
+      switch (w.severity) {
         case WarningSeverity.high:
-          score -= 30;
-          break;
+          score -= 40;
+          break; // Hukuman lebih berat
         case WarningSeverity.medium:
           score -= 15;
           break;
@@ -295,30 +289,31 @@ class FoodAnalyzer {
           break;
       }
     }
-
     return score.clamp(0, 100);
   }
 }
 
+// Model Hasil Analisis yang diperbarui
 class AnalysisResult {
-  final bool isSafe;
+  final TrafficLight trafficLight; // Indikator Utama
   final List<Warning> warnings;
   final List<String> recommendations;
   final double overallScore;
 
   AnalysisResult({
-    required this.isSafe,
+    required this.trafficLight,
     required this.warnings,
     required this.recommendations,
     required this.overallScore,
   });
 
+  bool get isSafe => trafficLight != TrafficLight.red;
+
   String get scoreCategory {
-    if (overallScore >= 80) return 'Sangat Baik';
-    if (overallScore >= 60) return 'Baik';
-    if (overallScore >= 40) return 'Cukup';
-    if (overallScore >= 20) return 'Kurang Baik';
-    return 'Tidak Disarankan';
+    if (overallScore >= 80) return 'Sangat Sehat';
+    if (overallScore >= 60) return 'Cukup Sehat';
+    if (overallScore >= 40) return 'Kurang Sehat';
+    return 'Tidak Sehat';
   }
 }
 
@@ -331,7 +326,7 @@ class Warning {
 }
 
 enum WarningSeverity {
-  high, // Berbahaya, tidak disarankan
-  medium, // Perlu perhatian
-  low, // Informasi
+  high, // Merah (Bahaya)
+  medium, // Kuning (Peringatan)
+  low, // Info
 }

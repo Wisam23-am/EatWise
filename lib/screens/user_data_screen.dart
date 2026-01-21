@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/user_profile.dart'; // Menggunakan model asli (tanpa name)
+import 'package:provider/provider.dart';
+import '../models/user_profile.dart';
+import '../providers/user_provider.dart'; // Pastikan path ini sesuai
 import 'barcode_scanner_screen.dart';
 import '../widgets/common_widgets.dart';
 
@@ -14,7 +16,7 @@ class UserDataScreen extends StatefulWidget {
 class _UserDataScreenState extends State<UserDataScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controller hanya untuk data fisik
+  // Controller untuk data fisik
   final _ageController = TextEditingController();
   final _weightController = TextEditingController();
   final _heightController = TextEditingController();
@@ -23,8 +25,8 @@ class _UserDataScreenState extends State<UserDataScreen> {
   String _activityLevel = 'Sedang';
   String _goal = 'Maintain';
 
-  final List<String> _selectedMedicalConditions = [];
-  final List<String> _selectedAllergies = [];
+  List<String> _selectedMedicalConditions = [];
+  List<String> _selectedAllergies = [];
 
   final List<String> _medicalConditionOptions = [
     'Diabetes',
@@ -46,6 +48,29 @@ class _UserDataScreenState extends State<UserDataScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Load data terakhir dari Provider (Auto-fill) jika ada
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<UserProvider>(context, listen: false);
+      if (provider.hasData && provider.userProfile != null) {
+        final profile = provider.userProfile!;
+        setState(() {
+          _ageController.text = profile.age.toString();
+          _weightController.text = profile.weight.toString();
+          _heightController.text = profile.height.toString();
+          _gender = profile.gender;
+          _activityLevel = profile.activityLevel;
+          _goal = profile.goal;
+          // Buat list baru agar tidak referensi ke list lama
+          _selectedMedicalConditions = List.from(profile.medicalConditions);
+          _selectedAllergies = List.from(profile.allergies);
+        });
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _ageController.dispose();
     _weightController.dispose();
@@ -53,9 +78,9 @@ class _UserDataScreenState extends State<UserDataScreen> {
     super.dispose();
   }
 
-  void _continueToScanner() {
+  void _saveAndContinue() async {
     if (_formKey.currentState!.validate()) {
-      // Membuat objek profil HANYA untuk sesi ini (passing data)
+      // Membuat objek profil dari input form
       final profile = UserProfile(
         age: int.parse(_ageController.text),
         weight: double.parse(_weightController.text),
@@ -67,12 +92,18 @@ class _UserDataScreenState extends State<UserDataScreen> {
         goal: _goal,
       );
 
-      // Langsung pindah ke Scanner membawa data profile
+      // SIMPAN ke Provider (dan SharedPreferences di dalamnya)
+      await Provider.of<UserProvider>(
+        context,
+        listen: false,
+      ).saveUserData(profile);
+
+      if (!mounted) return;
+
+      // Pindah ke Scanner TANPA membawa data profile di constructor
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (context) => BarcodeScannerScreen(userProfile: profile),
-        ),
+        MaterialPageRoute(builder: (context) => const BarcodeScannerScreen()),
       );
     }
   }
@@ -271,8 +302,8 @@ class _UserDataScreenState extends State<UserDataScreen> {
             FadeInSlide(
               delay: 1.2,
               child: PrimaryButton(
-                text: 'Lanjut Scan',
-                onPressed: _continueToScanner,
+                text: 'Simpan & Scan',
+                onPressed: _saveAndContinue,
               ),
             ),
             const SizedBox(height: 20),

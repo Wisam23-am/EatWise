@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/user_profile.dart';
 import '../services/food_api_service.dart';
 import 'result_screen.dart';
+import 'barcode_scanner_screen.dart'; // Import scanner untuk tombol back jika perlu
 
-/// Screen ini untuk testing tanpa perlu scan barcode
-/// Bisa langsung input barcode secara manual
 class ManualBarcodeScreen extends StatefulWidget {
-  final UserProfile userProfile;
-
-  const ManualBarcodeScreen({super.key, required this.userProfile});
+  // HAPUS parameter userProfile
+  const ManualBarcodeScreen({super.key});
 
   @override
   State<ManualBarcodeScreen> createState() => _ManualBarcodeScreenState();
@@ -42,13 +39,11 @@ class _ManualBarcodeScreenState extends State<ManualBarcodeScreen> {
         _showError('Produk dengan barcode $barcode tidak ditemukan');
       } else {
         if (mounted) {
+          // Navigasi ke ResultScreen TANPA userProfile
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => ResultScreen(
-                userProfile: widget.userProfile,
-                foodProduct: product,
-              ),
+              builder: (context) => ResultScreen(foodProduct: product),
             ),
           );
         }
@@ -76,6 +71,18 @@ class _ManualBarcodeScreenState extends State<ManualBarcodeScreen> {
         ),
         backgroundColor: Colors.teal.shade600,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Kembali ke scanner jika user menekan tombol back
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const BarcodeScannerScreen(),
+              ),
+            );
+          },
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
