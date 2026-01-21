@@ -1,166 +1,137 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'user_data_screen.dart';
-import '../models/user_profile.dart';
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/common_widgets.dart'; // Pastikan widget animasi FadeInSlide ada di sini
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  UserProfile? _cachedProfile;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCachedProfile();
-  }
-
-  Future<void> _loadCachedProfile() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final profileJson = prefs.getString('user_profile');
-      if (profileJson != null) {
-        setState(() {
-          _cachedProfile = UserProfile.fromJson(json.decode(profileJson));
-        });
-      }
-    } catch (e) {
-      print('Error loading cached profile: $e');
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.green.shade400, Colors.teal.shade600],
-          ),
-        ),
-        child: SafeArea(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 60),
-              // Logo/Icon
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.qr_code_scanner,
-                  size: 80,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Title
-              Text(
-                'EatWise',
-                style: GoogleFonts.poppins(
-                  fontSize: 42,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Scan & Cek Makananmu',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  color: Colors.white.withOpacity(0.9),
-                ),
-              ),
-              const Spacer(),
-              // Info Card
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 24),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    _buildFeatureItem(
-                      Icons.qr_code_scanner,
-                      'Scan Barcode',
-                      'Pindai barcode makanan & minuman',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildFeatureItem(
-                      Icons.person,
-                      'Data Kesehatan',
-                      'Masukkan data kesehatan Anda',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildFeatureItem(
-                      Icons.analytics,
-                      'Analisis Cerdas',
-                      'Dapatkan rekomendasi kesehatan',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-              // Start Button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            UserDataScreen(existingProfile: _cachedProfile),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.teal.shade700,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    elevation: 5,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+
+              // 1. Hero Section (Logo & Tagline)
+              FadeInSlide(
+                delay: 0.2,
+                child: Center(
+                  child: Column(
                     children: [
-                      Text(
-                        _cachedProfile != null
-                            ? 'Mulai Scan Makanan'
-                            : 'Mulai Sekarang',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                      Hero(
+                        tag: 'app_logo',
+                        child: Container(
+                          height: 140,
+                          width: 140,
+                          decoration: BoxDecoration(
+                            color: Colors.teal.shade50,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.teal.withOpacity(0.1),
+                                blurRadius: 30,
+                                spreadRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.qr_code_scanner_rounded,
+                            size: 70,
+                            color: Colors.teal.shade400,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.arrow_forward),
+                      const SizedBox(height: 32),
+                      Text(
+                        'EatWise',
+                        style: GoogleFonts.poppins(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal.shade800,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Pindai. Analisis. Hidup Sehat.',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 40),
+
+              const SizedBox(height: 60),
+
+              // 2. Feature Cards (Modern List)
+              FadeInSlide(
+                delay: 0.3,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Fitur Unggulan',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              FadeInSlide(
+                delay: 0.4,
+                child: _buildModernFeatureCard(
+                  icon: Icons.qr_code_scanner,
+                  title: 'Scan Barcode',
+                  desc: 'Cek kandungan nutrisi instan',
+                  color: Colors.blue.shade50,
+                  iconColor: Colors.blue.shade600,
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              FadeInSlide(
+                delay: 0.5,
+                child: _buildModernFeatureCard(
+                  icon: Icons.analytics_outlined,
+                  title: 'Analisis Kesehatan',
+                  desc: 'Sesuaikan dengan kondisi tubuh',
+                  color: Colors.orange.shade50,
+                  iconColor: Colors.orange.shade600,
+                ),
+              ),
+
+              const SizedBox(height: 60),
+
+              // 3. Action Button
+              FadeInSlide(
+                delay: 0.6,
+                child: PrimaryButton(
+                  text: 'Mulai Sekarang',
+                  icon: Icons.arrow_forward_rounded,
+                  onPressed: () {
+                    // Langsung ke input data tanpa cek profil
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const UserDataScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -168,41 +139,62 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFeatureItem(IconData icon, String title, String subtitle) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.teal.shade50,
-            borderRadius: BorderRadius.circular(12),
+  Widget _buildModernFeatureCard({
+    required IconData icon,
+    required String title,
+    required String desc,
+    required Color color,
+    required Color iconColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
-          child: Icon(icon, color: Colors.teal.shade700, size: 24),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade800,
-                ),
-              ),
-              Text(
-                subtitle,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: iconColor, size: 26),
           ),
-        ),
-      ],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                Text(
+                  desc,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/user_profile.dart';
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../models/user_profile.dart'; // Menggunakan model asli (tanpa name)
 import 'barcode_scanner_screen.dart';
+import '../widgets/common_widgets.dart';
 
 class UserDataScreen extends StatefulWidget {
-  final UserProfile? existingProfile;
-
-  const UserDataScreen({super.key, this.existingProfile});
+  const UserDataScreen({super.key});
 
   @override
   State<UserDataScreen> createState() => _UserDataScreenState();
@@ -16,6 +13,8 @@ class UserDataScreen extends StatefulWidget {
 
 class _UserDataScreenState extends State<UserDataScreen> {
   final _formKey = GlobalKey<FormState>();
+
+  // Controller hanya untuk data fisik
   final _ageController = TextEditingController();
   final _weightController = TextEditingController();
   final _heightController = TextEditingController();
@@ -47,26 +46,6 @@ class _UserDataScreenState extends State<UserDataScreen> {
   ];
 
   @override
-  void initState() {
-    super.initState();
-    if (widget.existingProfile != null) {
-      _loadExistingProfile();
-    }
-  }
-
-  void _loadExistingProfile() {
-    final profile = widget.existingProfile!;
-    _ageController.text = profile.age.toString();
-    _weightController.text = profile.weight.toString();
-    _heightController.text = profile.height.toString();
-    _gender = profile.gender;
-    _activityLevel = profile.activityLevel;
-    _goal = profile.goal;
-    _selectedMedicalConditions.addAll(profile.medicalConditions);
-    _selectedAllergies.addAll(profile.allergies);
-  }
-
-  @override
   void dispose() {
     _ageController.dispose();
     _weightController.dispose();
@@ -74,8 +53,9 @@ class _UserDataScreenState extends State<UserDataScreen> {
     super.dispose();
   }
 
-  Future<void> _saveAndContinue() async {
+  void _continueToScanner() {
     if (_formKey.currentState!.validate()) {
+      // Membuat objek profil HANYA untuk sesi ini (passing data)
       final profile = UserProfile(
         age: int.parse(_ageController.text),
         weight: double.parse(_weightController.text),
@@ -87,18 +67,13 @@ class _UserDataScreenState extends State<UserDataScreen> {
         goal: _goal,
       );
 
-      // Simpan ke SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_profile', json.encode(profile.toJson()));
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => BarcodeScannerScreen(userProfile: profile),
-          ),
-        );
-      }
+      // Langsung pindah ke Scanner membawa data profile
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BarcodeScannerScreen(userProfile: profile),
+        ),
+      );
     }
   }
 
@@ -107,192 +82,200 @@ class _UserDataScreenState extends State<UserDataScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Data Kesehatan',
+          'Informasi Tubuh',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
-        backgroundColor: Colors.teal.shade600,
-        foregroundColor: Colors.white,
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           children: [
-            Text(
-              'Masukkan data kesehatan Anda untuk analisis yang lebih akurat',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey.shade600,
+            FadeInSlide(
+              delay: 0.1,
+              child: Text(
+                'Lengkapi data berikut agar kami dapat memberikan rekomendasi nutrisi yang tepat.',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
-            // Data Dasar
-            _buildSectionTitle('Data Dasar'),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _ageController,
-              keyboardType: TextInputType.number,
-              decoration: _buildInputDecoration('Umur', 'tahun'),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Mohon masukkan umur';
-                }
-                final age = int.tryParse(value);
-                if (age == null || age < 1 || age > 120) {
-                  return 'Umur tidak valid';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _weightController,
-              keyboardType: TextInputType.number,
-              decoration: _buildInputDecoration('Berat Badan', 'kg'),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Mohon masukkan berat badan';
-                }
-                final weight = double.tryParse(value);
-                if (weight == null || weight < 20 || weight > 300) {
-                  return 'Berat badan tidak valid';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _heightController,
-              keyboardType: TextInputType.number,
-              decoration: _buildInputDecoration('Tinggi Badan', 'cm'),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Mohon masukkan tinggi badan';
-                }
-                final height = double.tryParse(value);
-                if (height == null || height < 50 || height > 250) {
-                  return 'Tinggi badan tidak valid';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _gender,
-              decoration: _buildInputDecoration('Jenis Kelamin', ''),
-              items: [
-                'Laki-laki',
-                'Perempuan',
-              ].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-              onChanged: (value) => setState(() => _gender = value!),
-            ),
+            // Data Fisik
+            FadeInSlide(delay: 0.2, child: _buildSectionTitle('Data Fisik')),
+            const SizedBox(height: 16),
 
-            const SizedBox(height: 24),
-
-            // Aktivitas & Tujuan
-            _buildSectionTitle('Aktivitas & Tujuan'),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _activityLevel,
-              decoration: _buildInputDecoration('Level Aktivitas', ''),
-              items: [
-                'Rendah',
-                'Sedang',
-                'Tinggi',
-              ].map((a) => DropdownMenuItem(value: a, child: Text(a))).toList(),
-              onChanged: (value) => setState(() => _activityLevel = value!),
+            FadeInSlide(
+              delay: 0.3,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildModernInput(
+                      controller: _ageController,
+                      label: 'Umur',
+                      suffix: 'th',
+                      validator: (v) => v!.isEmpty ? 'Wajib' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildModernInput(
+                      controller: _weightController,
+                      label: 'Berat',
+                      suffix: 'kg',
+                      validator: (v) => v!.isEmpty ? 'Wajib' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildModernInput(
+                      controller: _heightController,
+                      label: 'Tinggi',
+                      suffix: 'cm',
+                      validator: (v) => v!.isEmpty ? 'Wajib' : null,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _goal,
-              decoration: _buildInputDecoration('Tujuan', ''),
-              items: [
-                'Diet',
-                'Maintain',
-                'Bulking',
-              ].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-              onChanged: (value) => setState(() => _goal = value!),
-            ),
+            const SizedBox(height: 16),
 
-            const SizedBox(height: 24),
-
-            // Riwayat Penyakit
-            _buildSectionTitle('Riwayat Penyakit'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _medicalConditionOptions.map((condition) {
-                final isSelected = _selectedMedicalConditions.contains(
-                  condition,
-                );
-                return FilterChip(
-                  label: Text(condition),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedMedicalConditions.add(condition);
-                      } else {
-                        _selectedMedicalConditions.remove(condition);
-                      }
-                    });
-                  },
-                  selectedColor: Colors.teal.shade100,
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Alergi
-            _buildSectionTitle('Alergi Makanan'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _allergyOptions.map((allergy) {
-                final isSelected = _selectedAllergies.contains(allergy);
-                return FilterChip(
-                  label: Text(allergy),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedAllergies.add(allergy);
-                      } else {
-                        _selectedAllergies.remove(allergy);
-                      }
-                    });
-                  },
-                  selectedColor: Colors.orange.shade100,
-                );
-              }).toList(),
+            FadeInSlide(
+              delay: 0.4,
+              child: _buildModernDropdown(
+                label: 'Jenis Kelamin',
+                value: _gender,
+                items: ['Laki-laki', 'Perempuan'],
+                onChanged: (v) => setState(() => _gender = v!),
+              ),
             ),
 
             const SizedBox(height: 32),
 
-            // Submit Button
-            ElevatedButton(
-              onPressed: _saveAndContinue,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal.shade600,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Lanjut ke Scanner',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+            // Aktivitas & Tujuan
+            FadeInSlide(delay: 0.5, child: _buildSectionTitle('Gaya Hidup')),
+            const SizedBox(height: 16),
+
+            FadeInSlide(
+              delay: 0.6,
+              child: _buildModernDropdown(
+                label: 'Level Aktivitas',
+                value: _activityLevel,
+                items: ['Rendah', 'Sedang', 'Tinggi'],
+                onChanged: (v) => setState(() => _activityLevel = v!),
               ),
             ),
             const SizedBox(height: 16),
+
+            FadeInSlide(
+              delay: 0.7,
+              child: _buildModernDropdown(
+                label: 'Target Kesehatan',
+                value: _goal,
+                items: ['Diet', 'Maintain', 'Bulking'],
+                onChanged: (v) => setState(() => _goal = v!),
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Riwayat Penyakit
+            FadeInSlide(
+              delay: 0.8,
+              child: _buildSectionTitle('Kondisi Medis (Opsional)'),
+            ),
+            const SizedBox(height: 12),
+            FadeInSlide(
+              delay: 0.9,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _medicalConditionOptions.map((condition) {
+                  final isSelected = _selectedMedicalConditions.contains(
+                    condition,
+                  );
+                  return ChoiceChip(
+                    label: Text(condition),
+                    selected: isSelected,
+                    selectedColor: Colors.teal.shade100,
+                    labelStyle: GoogleFonts.poppins(
+                      color: isSelected
+                          ? Colors.teal.shade800
+                          : Colors.grey.shade600,
+                      fontSize: 13,
+                    ),
+                    onSelected: (selected) {
+                      setState(() {
+                        selected
+                            ? _selectedMedicalConditions.add(condition)
+                            : _selectedMedicalConditions.remove(condition);
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Alergi
+            FadeInSlide(
+              delay: 1.0,
+              child: _buildSectionTitle('Alergi (Opsional)'),
+            ),
+            const SizedBox(height: 12),
+            FadeInSlide(
+              delay: 1.1,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _allergyOptions.map((allergy) {
+                  final isSelected = _selectedAllergies.contains(allergy);
+                  return ChoiceChip(
+                    label: Text(allergy),
+                    selected: isSelected,
+                    selectedColor: Colors.orange.shade100,
+                    labelStyle: GoogleFonts.poppins(
+                      color: isSelected
+                          ? Colors.orange.shade800
+                          : Colors.grey.shade600,
+                      fontSize: 13,
+                    ),
+                    onSelected: (selected) {
+                      setState(() {
+                        selected
+                            ? _selectedAllergies.add(allergy)
+                            : _selectedAllergies.remove(allergy);
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+
+            const SizedBox(height: 40),
+
+            // Submit Button
+            FadeInSlide(
+              delay: 1.2,
+              child: PrimaryButton(
+                text: 'Lanjut Scan',
+                onPressed: _continueToScanner,
+              ),
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -303,26 +286,85 @@ class _UserDataScreenState extends State<UserDataScreen> {
     return Text(
       title,
       style: GoogleFonts.poppins(
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: FontWeight.w600,
-        color: Colors.grey.shade800,
+        color: Colors.black87,
       ),
     );
   }
 
-  InputDecoration _buildInputDecoration(String label, String suffix) {
-    return InputDecoration(
-      labelText: label,
-      suffixText: suffix,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+  Widget _buildModernInput({
+    required TextEditingController controller,
+    required String label,
+    required String suffix,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(
+        labelText: label,
+        suffixText: suffix,
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        labelStyle: GoogleFonts.poppins(
+          color: Colors.grey.shade600,
+          fontSize: 13,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.teal.shade400, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.teal.shade600, width: 2),
+      validator: validator,
+    );
+  }
+
+  Widget _buildModernDropdown({
+    required String label,
+    required String value,
+    required List<String> items,
+    required void Function(String?) onChanged,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        labelStyle: GoogleFonts.poppins(
+          color: Colors.grey.shade600,
+          fontSize: 13,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
       ),
+      items: items
+          .map((i) => DropdownMenuItem(value: i, child: Text(i)))
+          .toList(),
+      onChanged: onChanged,
     );
   }
 }
